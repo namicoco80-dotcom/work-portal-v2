@@ -1,0 +1,13 @@
+{
+  "name": "work-portal-v2-test",
+  "type": "module",
+  "scripts": {
+    "test:pure":   "node --experimental-vm-modules tests/manager-models.test.js",
+    "test:focus":  "node --experimental-vm-modules tests/focus-manager.dom.test.js",
+    "test:overlay":"node --experimental-vm-modules tests/overlay-manager.dom.test.js",
+    "test:modal":  "node --experimental-vm-modules tests/modal-manager.dom.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}
