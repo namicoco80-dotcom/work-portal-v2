@@ -2,4 +2,13 @@ engine_version=2.0.0
 snapshot_version=2.0.0
 report_version=2.0.0
 app_version=0.1.0
-tag=v0.1-engine-core
+git_tag=v0.1-engine-core
+
+# ── Version ↔ Tag Mapping ──────────────────────────────
+# engine_version  | git_tag              | date
+# 2.0.0           | v0.1-engine-core     | 2026-06-09
+#
+# 규칙:
+#   engine_version 변경 시 반드시 새 git tag 생성
+#   기존 tag는 절대 재사용/재지정 금지
+#   engine_version == report_version (항상 동기)
