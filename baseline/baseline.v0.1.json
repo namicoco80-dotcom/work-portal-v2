@@ -1,0 +1,123 @@
+{
+  "_meta": {
+    "file":             "baseline.v0.1.json",
+    "role":             "truth anchor — regression 절대 기준",
+    "created_at":       "2026-06-09T00:00:00.000Z",
+    "engine_version":   "2.0.0",
+    "snapshot_version": "2.0.0",
+    "report_version":   "2.0.0",
+    "git_tag":          "v0.1-engine-core",
+    "note":             "이 파일은 절대 수정 금지. 새 기준 필요 시 baseline.v0.2.json 생성."
+  },
+
+  "store_initial_state": {
+    "snapshot_version": "2.0.0",
+    "engine_version":   "2.0.0",
+    "report_version":   "2.0.0",
+    "metadata": {
+      "createdAt": "2026-06-09T00:00:00.000Z",
+      "updatedAt": "2026-06-09T00:00:00.000Z",
+      "tag":       "v0.1-engine-core"
+    },
+    "data": {
+      "settings":  { "language": "ko", "theme": "default" },
+      "memo":      { "byDate": {} },
+      "todos":     { "items": [], "filters": {}, "stats": {} },
+      "calendar":  { "events": [] },
+      "projects":  { "items": [] },
+      "kpi":       { "items": [] },
+      "handover":  { "reports": [] }
+    }
+  },
+
+  "manager_initial_state": {
+    "focus":   { "targetId": null, "restoredAt": null },
+    "overlay": { "stack": [] },
+    "modal":   { "queue": [] }
+  },
+
+  "engine_sample_io": {
+    "memo": {
+      "action": {
+        "type": "MEMO_SET",
+        "payload": {
+          "date":      "2026-06-09",
+          "content":   "baseline test memo",
+          "updatedAt": "2026-06-09T00:00:00.000Z"
+        }
+      },
+      "expected_delta": {
+        "path":  "data.memo.byDate['2026-06-09']",
+        "value": { "content": "baseline test memo", "updatedAt": "2026-06-09T00:00:00.000Z" }
+      }
+    },
+    "todo": {
+      "action": {
+        "type": "TODO_ADD",
+        "payload": {
+          "id":        "todo-baseline-001",
+          "title":     "baseline test todo",
+          "priority":  "normal",
+          "createdAt": "2026-06-09T00:00:00.000Z"
+        }
+      },
+      "expected_delta": {
+        "path":  "data.todos.items[0]",
+        "value": {
+          "id":        "todo-baseline-001",
+          "title":     "baseline test todo",
+          "priority":  "normal",
+          "dueDate":   null,
+          "projectId": null,
+          "done":      false,
+          "createdAt": "2026-06-09T00:00:00.000Z"
+        }
+      }
+    },
+    "calendar": {
+      "action": {
+        "type": "EVENT_ADD",
+        "payload": {
+          "id":        "evt-baseline-001",
+          "title":     "baseline test event",
+          "date":      "2026-06-09",
+          "createdAt": "2026-06-09T00:00:00.000Z"
+        }
+      },
+      "expected_delta": {
+        "path":  "data.calendar.events[0]",
+        "value": {
+          "id":        "evt-baseline-001",
+          "title":     "baseline test event",
+          "date":      "2026-06-09",
+          "time":      null,
+          "color":     "default",
+          "createdAt": "2026-06-09T00:00:00.000Z"
+        }
+      }
+    },
+    "focus_manager": {
+      "action":   { "type": "FOCUS_EDITOR" },
+      "expected": { "targetId": "memo-editor", "restoredAt": null }
+    },
+    "overlay_manager": {
+      "action":   { "type": "OVERLAY_OPEN", "id": "settings-panel" },
+      "expected": { "stack": ["settings-panel"] }
+    },
+    "modal_manager": {
+      "action": {
+        "type":  "MODAL_PUSH",
+        "modal": { "id": "confirm-001", "type": "confirm", "title": "test", "message": "baseline?" }
+      },
+      "expected": {
+        "queue": [{ "id": "confirm-001", "type": "confirm", "title": "test", "message": "baseline?", "status": "pending" }]
+      }
+    }
+  },
+
+  "determinism_seed": {
+    "note":      "모든 timestamp은 payload로 주입. Date.now() / crypto.randomUUID() 엔진 내부 직접 호출 금지.",
+    "fixed_ts":  "2026-06-09T00:00:00.000Z",
+    "fixed_ids": ["todo-baseline-001", "evt-baseline-001", "confirm-001"]
+  }
+}
