@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "no-restricted-globals": [
+      "error",
+      { "name": "confirm", "message": "Use ModalManager.confirm()" },
+      { "name": "alert",   "message": "Use ModalManager.alert()" },
+      { "name": "prompt",  "message": "Use ModalManager.prompt()" }
+    ],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "MemberExpression[object.name='store'][property.name='_snapshot']",
+        "message": "store._snapshot 직접 접근 금지. store.getSnapshot() 사용."
+      }
+    ]
+  }
+}
