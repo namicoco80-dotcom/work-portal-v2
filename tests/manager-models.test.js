@@ -9,7 +9,7 @@ import {
   modalReduce,
   getActiveModal,
   getTopOverlay,
-} from './manager-models.js';
+} from '../shared/manager-models.js';
 
 let passed = 0, failed = 0;
 function assert(condition, msg) {
