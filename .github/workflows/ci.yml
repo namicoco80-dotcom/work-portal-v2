@@ -1,0 +1,82 @@
+# .github/workflows/ci.yml
+# 업무Portal v2 — CI Pipeline
+#
+# Gates (순서 고정):
+#   1. Pure Logic Tests   (DOM 없음, Electron 없음)
+#   2. jsdom DOM Tests    (브라우저 레이어 regression)
+#   3. Contract Gate      (금지 패턴 빌드 차단)
+#   4. Determinism Gate   (same input → same output)
+#   5. Version Lock Gate  (engine_version == report_version)
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── GATE 1: Pure Logic Tests ──────────────────────────
+  pure-tests:
+    name: "Gate 1 · Pure Logic Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: store.test
+        run: node tests/store.test.js
+      - name: migration-engine.test
+        run: node tests/migration-engine.test.js
+      - name: manager-models.test
+        run: node tests/manager-models.test.js
+
+  # ── GATE 2: jsdom DOM Tests ───────────────────────────
+  dom-tests:
+    name: "Gate 2 · jsdom DOM Tests"
+    runs-on: ubuntu-latest
+    needs: pure-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: focus-manager DOM
+        run: node tests/focus-manager.dom.test.js
+      - name: overlay-manager DOM
+        run: node tests/overlay-manager.dom.test.js
+      - name: modal-manager DOM
+        run: node tests/modal-manager.dom.test.js
+
+  # ── GATE 3: Contract Gate ─────────────────────────────
+  contract-gate:
+    name: "Gate 3 · Contract Gate (금지 패턴 차단)"
+    runs-on: ubuntu-latest
+    needs: pure-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run contract checker
+        run: node scripts/contract-check.js
+
+  # ── GATE 4 & 5: Determinism + Version Lock ───────────
+  determinism-gate:
+    name: "Gate 4+5 · Determinism + Version Lock"
+    runs-on: ubuntu-latest
+    needs: [dom-tests, contract-gate]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Determinism test
+        run: node tests/determinism.test.js
+      - name: Version lock check
+        run: node scripts/version-check.js
