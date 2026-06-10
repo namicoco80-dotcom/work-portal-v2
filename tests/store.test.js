@@ -2,8 +2,8 @@
 // 업무Portal v2 — STEP 1-B 테스트
 // 실행: node store.test.js
 
-import { store }                       from './store.js';
-import { INITIAL_SNAPSHOT, createSnapshot } from './snapshot.js';
+import { store }                       from '../core/store.js';
+import { INITIAL_SNAPSHOT, createSnapshot } from '../core/snapshot.js';
 
 let passed = 0;
 let failed = 0;
