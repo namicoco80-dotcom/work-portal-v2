@@ -11,7 +11,7 @@ import { reduce as memoReduce }     from './memo-engine.js';
 import { reduce as calendarReduce } from './calendar-engine.js';
 
 const TODO_ACTIONS     = ['TODO_ADD', 'TODO_UPDATE', 'TODO_DELETE', 'TODO_COMPLETE', 'TODO_CLEAR_DONE'];
-const MEMO_ACTIONS     = ['MEMO_UPDATE', 'MEMO_PIN'];
+const MEMO_ACTIONS     = ['MEMO_SET', 'MEMO_UPDATE', 'MEMO_PIN'];
 const CALENDAR_ACTIONS = ['EVENT_ADD', 'EVENT_UPDATE', 'EVENT_DELETE'];
 
 export function reduce(snapshot, action) {
