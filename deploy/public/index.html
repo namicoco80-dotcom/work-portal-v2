@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>업무Portal v2 — Dashboard</title>
+<style>
+  :root {
+    --bg:      #0d1117;
+    --surface: #161b22;
+    --border:  #30363d;
+    --text:    #e6edf3;
+    --muted:   #8b949e;
+    --green:   #3fb950;
+    --red:     #f85149;
+    --yellow:  #d29922;
+    --blue:    #58a6ff;
+    --purple:  #bc8cff;
+    --font:    'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  header { border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 15px; font-weight: 600; }
+  .ver { font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; }
+
+  nav { display: flex; gap: 2px; padding: 12px 24px 0; border-bottom: 1px solid var(--border); }
+  nav button { background: none; border: none; color: var(--muted); font-size: 13px; padding: 8px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s; }
+  nav button.active { color: var(--text); border-bottom-color: var(--blue); }
+  nav button:hover { color: var(--text); }
+
+  main { padding: 24px; max-width: 960px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px,1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .card .value { font-size: 22px; font-weight: 700; }
+  .card .sub   { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .section-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 24px 0 10px; }
+
+  .wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .wrap-header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+  .badge.pass { background: rgba(63,185,80,.15); color: var(--green); }
+  .badge.fail { background: rgba(248,81,73,.15); color: var(--red); }
+
+  .snap-body { padding: 16px; font-family: 'Cascadia Code','Fira Code',monospace; font-size: 12px; line-height: 1.7; overflow-x: auto; white-space: pre; }
+  .jk { color: var(--blue); }
+  .js { color: var(--green); }
+  .jn { color: var(--purple); }
+  .jb { color: var(--yellow); }
+  .jz { color: var(--muted); }
+
+  .diff-add td { background: rgba(63,185,80,.07); }
+  .diff-del td { background: rgba(248,81,73,.07); }
+  .diff-same td { opacity: .45; }
+
+  .audit-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 8px; }
+  .audit-item .meta { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .tag-chip { display: inline-block; font-size: 11px; background: rgba(88,166,255,.12); color: var(--blue); border-radius: 4px; padding: 1px 6px; margin-right: 4px; font-family: monospace; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <rect width="20" height="20" rx="5" fill="#58a6ff" fill-opacity=".18"/>
+    <path d="M5 10h10M5 6h10M5 14h6" stroke="#58a6ff" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+  <h1>업무Portal v2</h1>
+  <span class="ver" id="ver-chip">—</span>
+</header>
+
+<nav>
+  <button class="active" onclick="show('ci')">CI Report</button>
+  <button onclick="show('snapshot')">Snapshot</button>
+  <button onclick="show('diff')">Diff</button>
+  <button onclick="show('audit')">Audit</button>
+</nav>
+
+<main>
+  <div id="tab-ci">
+    <div class="grid" id="summary-cards"></div>
+    <div class="section-title">Gate Results</div>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>Gate</th><th>Description</th><th>Tests</th><th>Status</th></tr></thead>
+        <tbody id="gate-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-snapshot" class="hidden">
+    <div class="wrap">
+      <div class="wrap-header"><span>baseline.v0.1.json</span><span id="snap-tag"></span></div>
+      <div class="snap-body" id="snap-body"></div>
+    </div>
+  </div>
+
+  <div id="tab-diff" class="hidden">
+    <div class="section-title">Baseline vs Current</div>
+    <div class="wrap">
+      <table>
+        <thead><tr><th style="width:28px"></th><th>Path</th><th>Baseline</th><th>Current</th></tr></thead>
+        <tbody id="diff-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-audit" class="hidden">
+    <div id="audit-body"></div>
+  </div>
+</main>
+
+<script>
+const DATA = {
+  version: { engine:"2.0.0", snapshot:"2.0.0", report:"2.0.0", app:"0.1.0", git_tag:"v0.3-ci-gates" },
+  gates: [
+    { id:1, name:"Pure Logic Tests",  desc:"store · migration · manager-models", tests:60, pass:60, status:"pass" },
+    { id:2, name:"jsdom DOM Tests",   desc:"focus · overlay · modal",             tests:42, pass:42, status:"pass" },
+    { id:3, name:"Contract Gate",     desc:"금지 패턴 빌드 차단",                  tests:null, pass:null, status:"pass" },
+    { id:4, name:"Determinism Gate",  desc:"same input → same output × 3",       tests:8,  pass:8,  status:"pass" },
+    { id:5, name:"Version Lock Gate", desc:"engine == report version",            tests:9,  pass:9,  status:"pass" },
+  ],
+  baseline: {
+    _meta: { engine_version:"2.0.0", snapshot_version:"2.0.0", git_tag:"v0.1-engine-core", created_at:"2026-06-09T00:00:00.000Z" },
+    store_initial_state: {
+      engine_version:"2.0.0", snapshot_version:"2.0.0", report_version:"2.0.0",
+      data: { memo:{ byDate:{} }, todos:{ items:[] }, calendar:{ events:[] } }
+    },
+    determinism_seed: { fixed_ts:"2026-06-09T00:00:00.000Z", note:"timestamp은 payload로 주입" }
+  },
+  tags: [
+    { tag:"v0.3-ci-gates",        msg:"CI 5 Gates — 109 PASS",                     date:"2026-06-09" },
+    { tag:"v0.2-jsdom-layer",     msg:"jsdom DOM tests — 42 PASS",                  date:"2026-06-09" },
+    { tag:"v0.1.1-change-control",msg:"Governance — baseline + VERSION + CC",       date:"2026-06-09" },
+    { tag:"v0.1-engine-core",     msg:"최초 baseline freeze",                        date:"2026-06-09" },
+  ],
+  contracts: [
+    { id:"00", title:"Change Control",   rule:"모든 tag는 immutable. 수정 시 새 tag 생성." },
+    { id:"01", title:"Focus Contract",   rule:"element.focus() 직접 호출 금지 → FocusManager 사용." },
+    { id:"02", title:"Modal Contract",   rule:"window.confirm/alert/prompt 금지 → ModalManager 사용." },
+    { id:"05", title:"Snapshot Contract",rule:"snapshot 직접 mutation 금지 → dispatch() 사용." },
+    { id:"08", title:"Adapter Contract", rule:"UI → engine 직접 호출 금지 → store.dispatch() 사용." },
+  ]
+};
+
+function show(tab) {
+  ['ci','snapshot','diff','audit'].forEach(t =>
+    document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab));
+  document.querySelectorAll('nav button').forEach((b,i) =>
+    b.classList.toggle('active', ['ci','snapshot','diff','audit'][i]===tab));
+}
+
+// ver chip
+document.getElementById('ver-chip').textContent = DATA.version.git_tag;
+
+// summary cards
+const total = DATA.gates.reduce((s,g)=>s+(g.tests||0),0);
+const pass  = DATA.gates.reduce((s,g)=>s+(g.pass||0),0);
+document.getElementById('summary-cards').innerHTML = [
+  { label:"Total Tests",  value:total,                    sub:`${pass} passing` },
+  { label:"Gates",        value:DATA.gates.length,        sub:"all passing ✓" },
+  { label:"Engine",       value:DATA.version.engine,      sub:`== report ${DATA.version.report}` },
+  { label:"Tag",          value:DATA.version.git_tag,     sub:"frozen baseline" },
+].map(c=>`<div class="card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('');
+
+// gate table
+document.getElementById('gate-table').innerHTML = DATA.gates.map(g=>`
+  <tr>
+    <td>Gate ${g.id}</td>
+    <td>${g.name}<br><span style="font-size:11px;color:var(--muted)">${g.desc}</span></td>
+    <td>${g.tests!=null?`${g.pass} / ${g.tests}`:'—'}</td>
+    <td><span class="badge ${g.status}">${g.status==='pass'?'✓ PASS':'✗ FAIL'}</span></td>
+  </tr>`).join('');
+
+// snapshot viewer
+function jHL(v,d=0){
+  const p='  '.repeat(d);
+  if(v===null)return`<span class="jz">null</span>`;
+  if(typeof v==='boolean')return`<span class="jb">${v}</span>`;
+  if(typeof v==='number') return`<span class="jn">${v}</span>`;
+  if(typeof v==='string') return`<span class="js">"${v}"</span>`;
+  if(Array.isArray(v)){
+    if(!v.length)return'[]';
+    return'[\n'+v.map(x=>p+'  '+jHL(x,d+1)).join(',\n')+'\n'+p+']';
+  }
+  const ks=Object.keys(v);
+  if(!ks.length)return'{}';
+  return'{\n'+ks.map(k=>`${p}  <span class="jk">"${k}"</span>: ${jHL(v[k],d+1)}`).join(',\n')+'\n'+p+'}';
+}
+document.getElementById('snap-tag').textContent = DATA.baseline._meta.git_tag;
+document.getElementById('snap-body').innerHTML = jHL(DATA.baseline);
+
+// diff viewer
+function flat(obj,pre=''){
+  const r={};
+  for(const[k,v] of Object.entries(obj||{})){
+    const p=pre?`${pre}.${k}`:k;
+    if(v&&typeof v==='object'&&!Array.isArray(v))Object.assign(r,flat(v,p));
+    else r[p]=JSON.stringify(v);
+  }
+  return r;
+}
+const bl=flat(DATA.baseline.store_initial_state);
+const cur={...bl};
+document.getElementById('diff-table').innerHTML=
+  [...new Set([...Object.keys(bl),...Object.keys(cur)])].map(k=>{
+    if(bl[k]===cur[k])
+      return`<tr class="diff-same"><td></td><td style="font-size:11px">${k}</td><td colspan="2">${bl[k]??'—'}</td></tr>`;
+    return`<tr class="diff-del"><td style="color:var(--red);font-weight:700">−</td><td>${k}</td><td>${bl[k]??'—'}</td><td>${cur[k]??'—'}</td></tr>`;
+  }).join('');
+
+// audit
+document.getElementById('audit-body').innerHTML=
+  '<div class="section-title">Version History</div>'+
+  DATA.tags.map(t=>`<div class="audit-item"><div class="meta">${t.date}</div><div><span class="tag-chip">${t.tag}</span>${t.msg}</div></div>`).join('')+
+  '<div class="section-title" style="margin-top:24px">Active Contracts</div>'+
+  DATA.contracts.map(c=>`<div class="audit-item"><div class="meta">contracts/${c.id}-*.md</div><div><strong>${c.title}</strong> — ${c.rule}</div></div>`).join('');
+</script>
+</body>
+</html>
