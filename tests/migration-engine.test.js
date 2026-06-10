@@ -1,7 +1,7 @@
 // migration-engine.test.js
 // 업무Portal v2 — Migration Engine 테스트
 
-import { importBackup, detectVersion, migrateV1 } from './migration-engine.js';
+import { importBackup, detectVersion, migrateV1 } from '../backup/migration-engine.js';
 
 let passed = 0, failed = 0;
 function assert(condition, msg) {
