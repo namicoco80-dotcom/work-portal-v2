@@ -73,3 +73,5 @@ function createStore(initialSnapshot = INITIAL_SNAPSHOT) {
 }
 
 export const store = createStore();
+
+export { createStore };
