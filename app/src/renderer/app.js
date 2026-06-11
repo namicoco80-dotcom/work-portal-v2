@@ -1,281 +1,347 @@
 // src/renderer/app.js
-// 업무Portal v2 — Calendar MVP
-//
-// Flow: UI → command → store.dispatch() → snapshot → render
-// 금지: snapshot 직접 수정 / engine 직접 호출 / element.focus() 직접 호출
+// 업무Portal v2 — STEP 7 UI Expansion
+// Views: Calendar | Todo | Memo | Snapshot
+// Flow:  UI → dispatch(command) → snapshot → render(snapshot)
 
 /* --- IMPORTS --- */
 import { store }        from '../../core/store.js';
 import { FocusManager } from '../../shared/focus-manager.js';
-import { ModalManager } from '../../shared/modal-manager.js';
 
 /* --- CONSTANTS --- */
-const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
-const COLORS    = ['default', 'red', 'green'];
+const PRIORITIES = { high:'높음', normal:'보통', low:'낮음' };
 
-/* --- STATE (UI only — view cursor) --- */
-let viewYear  = new Date().getFullYear();
-let viewMonth = new Date().getMonth();       // 0-based
-let selectedDate = toDateStr(new Date());    // YYYY-MM-DD
+/* --- UI STATE (view cursor only) --- */
+let currentView  = 'calendar';
+let viewYear     = new Date().getFullYear();
+let viewMonth    = new Date().getMonth();
+let selectedDate = toDateStr(new Date());
 
-/* --- HELPERS --- */
+/* --- UTILS --- */
 function toDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function todayStr() { return toDateStr(new Date()); }
-function newId()    { return `evt-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; }
-function nowISO()   { return new Date().toISOString(); }
-
-function getEvents() {
-  return store.getSnapshot().data.calendar.events;
+function todayStr()   { return toDateStr(new Date()); }
+function newId(p='id'){ return `${p}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
+function nowISO()     { return new Date().toISOString(); }
+function escHtml(s)   {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-function getEventsForDate(dateStr) {
-  return getEvents().filter(e => e.date === dateStr);
-}
+function el(id) { return document.getElementById(id); }
 
-/* --- RENDER --- */
+/* --- SNAPSHOT ACCESSORS --- */
+function snap()        { return store.getSnapshot(); }
+function getEvents()   { return snap().data.calendar.events; }
+function getTodos()    { return snap().data.todos.items; }
+function getMemo(date) { return snap().data.memo.byDate[date]?.content || ''; }
+
+/* ═══════════════════════════════════
+   RENDER ROUTER
+═══════════════════════════════════ */
 function render() {
-  renderHeader();
-  renderMonthNav();
-  renderDayCells();
-  renderEventList();
+  document.querySelectorAll('.view').forEach(v =>
+    v.classList.toggle('hidden', v.id !== `view-${currentView}`));
+  document.querySelectorAll('.nav-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.view === currentView));
+
+  if (currentView === 'calendar') renderCalendar();
+  if (currentView === 'todo')     renderTodo();
+  if (currentView === 'memo')     renderMemo();
+  if (currentView === 'snapshot') renderSnapshot();
 }
 
-function renderHeader() {
+/* ═══════════════════════════════════
+   CALENDAR
+═══════════════════════════════════ */
+function renderCalendar() {
   const today = new Date();
   const days  = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
-  document.getElementById('today-label').textContent =
-    `${today.getMonth()+1}월 ${today.getDate()}일`;
-  document.getElementById('today-sub').textContent =
-    `${today.getFullYear()} · ${days[today.getDay()]}`;
-}
+  el('cal-today-label').textContent = `${today.getMonth()+1}월 ${today.getDate()}일`;
+  el('cal-today-sub').textContent   = `${today.getFullYear()} · ${days[today.getDay()]}`;
+  el('cal-month-label').textContent = `${viewYear}년 ${viewMonth+1}월`;
 
-function renderMonthNav() {
-  document.getElementById('month-label').textContent =
-    `${viewYear}년 ${viewMonth+1}월`;
-}
-
-function renderDayCells() {
-  // Day name header (한 번만 그려도 되지만 단순화)
-  const namesEl = document.getElementById('day-names');
-  namesEl.innerHTML = DAY_NAMES.map(d =>
-    `<div class="day-name">${d}</div>`
-  ).join('');
-
-  // 이달 첫날 요일, 마지막날
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
-  const lastDate = new Date(viewYear, viewMonth+1, 0).getDate();
-
-  const cellsEl = document.getElementById('day-cells');
-  const today   = todayStr();
+  const cellsEl    = el('cal-cells');
+  const todayDS    = todayStr();
   const eventDates = new Set(getEvents().map(e => e.date));
+  const firstDay   = new Date(viewYear, viewMonth, 1).getDay();
+  const lastDate   = new Date(viewYear, viewMonth+1, 0).getDate();
+  const prevLast   = new Date(viewYear, viewMonth, 0).getDate();
 
   let html = '';
-
-  // 이전 달 빈 칸
-  const prevLast = new Date(viewYear, viewMonth, 0).getDate();
-  for (let i = firstDay - 1; i >= 0; i--) {
-    const d = prevLast - i;
-    const dateStr = toDateStr(new Date(viewYear, viewMonth-1, d));
-    html += `<div class="day-cell other-month" data-date="${dateStr}">${d}</div>`;
+  for (let i = firstDay-1; i >= 0; i--) {
+    const ds = toDateStr(new Date(viewYear, viewMonth-1, prevLast-i));
+    html += `<div class="day-cell other-month" data-date="${ds}">${prevLast-i}</div>`;
   }
-
-  // 이번 달
   for (let d = 1; d <= lastDate; d++) {
-    const dateStr = toDateStr(new Date(viewYear, viewMonth, d));
+    const ds = toDateStr(new Date(viewYear, viewMonth, d));
     let cls = 'day-cell';
-    if (dateStr === today)        cls += ' today';
-    if (dateStr === selectedDate) cls += ' selected';
-    if (eventDates.has(dateStr))  cls += ' has-event';
-    html += `<div class="${cls}" data-date="${dateStr}">${d}</div>`;
+    if (ds === todayDS)      cls += ' today';
+    if (ds === selectedDate) cls += ' selected';
+    if (eventDates.has(ds))  cls += ' has-event';
+    html += `<div class="${cls}" data-date="${ds}">${d}</div>`;
   }
-
-  // 다음 달 빈 칸 (6줄 고정)
-  const total = firstDay + lastDate;
-  const remain = total % 7 === 0 ? 0 : 7 - (total % 7);
+  const remain = (firstDay + lastDate) % 7 === 0 ? 0 : 7 - ((firstDay + lastDate) % 7);
   for (let d = 1; d <= remain; d++) {
-    const dateStr = toDateStr(new Date(viewYear, viewMonth+1, d));
-    html += `<div class="day-cell other-month" data-date="${dateStr}">${d}</div>`;
+    const ds = toDateStr(new Date(viewYear, viewMonth+1, d));
+    html += `<div class="day-cell other-month" data-date="${ds}">${d}</div>`;
   }
-
   cellsEl.innerHTML = html;
+  cellsEl.querySelectorAll('.day-cell').forEach(cell =>
+    cell.addEventListener('click', () => {
+      const d = new Date(cell.dataset.date);
+      selectedDate = cell.dataset.date;
+      viewYear = d.getFullYear(); viewMonth = d.getMonth();
+      renderCalendar();
+    })
+  );
 
-  // 날짜 클릭
-  cellsEl.querySelectorAll('.day-cell').forEach(el => {
-    el.addEventListener('click', () => {
-      selectedDate = el.dataset.date;
-      // viewMonth 이동 (다른 달 날짜 클릭 시)
-      const d = new Date(selectedDate);
-      viewYear  = d.getFullYear();
-      viewMonth = d.getMonth();
-      render();
-    });
-  });
-}
-
-function renderEventList() {
-  const label  = document.getElementById('event-date-label');
-  const listEl = document.getElementById('event-list');
-  const events = getEventsForDate(selectedDate);
-
-  // 날짜 표시
+  // Event list
+  const listEl = el('event-list');
   const d = new Date(selectedDate + 'T00:00:00');
-  label.textContent = `${d.getMonth()+1}월 ${d.getDate()}일 일정`;
+  el('event-date-label').textContent = `${d.getMonth()+1}월 ${d.getDate()}일 일정`;
+  const events = getEvents()
+    .filter(e => e.date === selectedDate)
+    .sort((a,b) => (a.time||'99:99').localeCompare(b.time||'99:99'));
 
-  if (events.length === 0) {
+  if (!events.length) {
     listEl.innerHTML = `<div class="empty-state">등록된 일정이 없습니다</div>`;
-    return;
-  }
-
-  listEl.innerHTML = events
-    .sort((a,b) => (a.time||'99:99').localeCompare(b.time||'99:99'))
-    .map(e => `
-      <div class="event-item" data-id="${e.id}">
-        <div class="event-dot ${e.color||'default'}"></div>
+  } else {
+    listEl.innerHTML = events.map(e => `
+      <div class="event-item">
+        <div class="event-dot color-${e.color||'default'}"></div>
         <span class="event-title">${escHtml(e.title)}</span>
         ${e.time ? `<span class="event-time">${e.time}</span>` : ''}
-        <button class="event-del" data-id="${e.id}" title="삭제">×</button>
-      </div>`)
-    .join('');
+        <button class="icon-btn del-btn" data-id="${e.id}">×</button>
+      </div>`).join('');
+    listEl.querySelectorAll('.del-btn').forEach(btn =>
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        store.dispatch({ type:'EVENT_DELETE', payload:{ id:btn.dataset.id } });
+      })
+    );
+  }
+}
 
-  // 삭제 버튼
-  listEl.querySelectorAll('.event-del').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      handleDeleteEvent(btn.dataset.id);
+/* ═══════════════════════════════════
+   TODO
+═══════════════════════════════════ */
+function renderTodo() {
+  const todos  = getTodos();
+  const active = todos.filter(t => !t.done);
+  const done   = todos.filter(t => t.done);
+
+  el('todo-stats').textContent = `${active.length}개 진행 중 · ${done.length}개 완료`;
+
+  const makeItems = (items, isDone) => items.map(t => `
+    <div class="todo-item${isDone?' done':''}">
+      <button class="todo-check${isDone?' checked':''}" data-id="${t.id}" data-done="${isDone}">
+        ${isDone ? '✓' : ''}
+      </button>
+      <div class="todo-body">
+        <span class="todo-title">${escHtml(t.title)}</span>
+        ${t.dueDate ? `<span class="todo-due">${t.dueDate}</span>` : ''}
+      </div>
+      <span class="prio-badge prio-${t.priority||'normal'}">${PRIORITIES[t.priority||'normal']}</span>
+      <button class="icon-btn del-btn" data-id="${t.id}">×</button>
+    </div>`).join('');
+
+  el('todo-active').innerHTML = active.length
+    ? makeItems(active, false)
+    : `<div class="empty-state">할 일 없음 🎉</div>`;
+
+  el('todo-done-section').classList.toggle('hidden', !done.length);
+  if (done.length) el('todo-done').innerHTML = makeItems(done, true);
+
+  el('todo-list-wrap').querySelectorAll('.todo-check').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const isDone = btn.dataset.done === 'true';
+      store.dispatch(isDone
+        ? { type:'TODO_UPDATE',    payload:{ id:btn.dataset.id, changes:{ done:false } } }
+        : { type:'TODO_COMPLETE',  payload:{ id:btn.dataset.id } }
+      );
+    });
+  });
+  el('todo-list-wrap').querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      store.dispatch({ type:'TODO_DELETE', payload:{ id:btn.dataset.id } });
     });
   });
 }
 
-/* --- COMMANDS --- */
+/* ═══════════════════════════════════
+   MEMO
+═══════════════════════════════════ */
+function renderMemo() {
+  const d = new Date(selectedDate+'T00:00:00');
+  el('memo-date-label').textContent =
+    `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`;
+  const ta = el('memo-textarea');
+  if (document.activeElement !== ta) ta.value = getMemo(selectedDate);
+  el('memo-saved').classList.add('hidden');
+}
 
-// UI → command → store.dispatch() → render
-function handleAddEvent({ title, time, color }) {
-  store.dispatch({
-    type: 'EVENT_ADD',
-    payload: {
-      id:        newId(),
-      title:     title.trim(),
-      date:      selectedDate,
-      time:      time || null,
-      color:     color || 'default',
-      createdAt: nowISO(),
-    },
+let memoTimer = null;
+function scheduleMemoSave(content) {
+  clearTimeout(memoTimer);
+  el('memo-saved').classList.add('hidden');
+  memoTimer = setTimeout(() => {
+    store.dispatch({ type:'MEMO_SET', payload:{ date:selectedDate, content, updatedAt:nowISO() } });
+    el('memo-saved').classList.remove('hidden');
+  }, 600);
+}
+
+/* ═══════════════════════════════════
+   SNAPSHOT VIEWER
+═══════════════════════════════════ */
+function renderSnapshot() {
+  const s = snap();
+  el('sv-engine').textContent  = s.engine_version;
+  el('sv-snap').textContent    = s.snapshot_version;
+  el('sv-updated').textContent = s.metadata?.updatedAt?.slice(0,19).replace('T',' ') || '—';
+  el('sv-todos').textContent   = getTodos().length;
+  el('sv-events').textContent  = getEvents().length;
+  el('sv-memos').textContent   = Object.keys(s.data.memo.byDate).length;
+  el('sv-json').textContent    = JSON.stringify(s, null, 2);
+}
+
+/* ═══════════════════════════════════
+   MODAL
+═══════════════════════════════════ */
+function openModal(html, onConfirm) {
+  const root = el('modal-root');
+  root.innerHTML = `<div class="modal-backdrop">${html}</div>`;
+  const bd = root.querySelector('.modal-backdrop');
+
+  const close = () => { root.innerHTML = ''; FocusManager.restore(); };
+  bd.querySelector('.btn-cancel')?.addEventListener('click', close);
+  bd.querySelector('.btn-confirm')?.addEventListener('click', () => {
+    if (onConfirm(bd)) close();
   });
-  render();
-  FocusManager.focusById('calendar-panel');
+  bd.addEventListener('keydown', e => { if (e.key==='Escape') close(); });
+  bd.addEventListener('click',   e => { if (e.target===bd) close(); });
+  setTimeout(() => bd.querySelector('input,textarea')?.focus(), 30);
 }
 
-function handleDeleteEvent(id) {
-  store.dispatch({ type: 'EVENT_DELETE', payload: { id } });
-  render();
-}
-
-/* --- MODAL: 일정 추가 ─────────────────────────────
-   ModalManager 사용 — window.confirm/alert 금지
-   직접 DOM 생성 (ModalManager.custom 패턴)
----------------------------------------------------*/
-function openAddModal() {
-  const backdrop = document.createElement('div');
-  backdrop.className = 'modal-backdrop';
-  backdrop.innerHTML = `
-    <div class="modal-box" id="add-modal-box">
-      <div class="modal-title">일정 추가</div>
-      <div class="modal-field">
-        <label>제목 *</label>
-        <input id="ev-title" type="text" placeholder="일정 제목" maxlength="80" autocomplete="off">
-      </div>
-      <div class="modal-field">
-        <label>시간 (선택)</label>
-        <input id="ev-time" type="time">
-      </div>
-      <div class="modal-field">
-        <label>색상</label>
+function openAddEventModal() {
+  FocusManager._lastTarget = el('cal-panel');
+  openModal(`
+    <div class="modal-box">
+      <div class="modal-title">일정 추가 — ${selectedDate}</div>
+      <div class="modal-field"><label>제목 *</label>
+        <input id="ev-title" type="text" placeholder="일정 제목" maxlength="80"></div>
+      <div class="modal-field"><label>시간 (선택)</label>
+        <input id="ev-time" type="time"></div>
+      <div class="modal-field"><label>색상</label>
         <select id="ev-color">
           <option value="default">기본 (파랑)</option>
           <option value="red">빨강</option>
           <option value="green">초록</option>
-        </select>
-      </div>
+        </select></div>
       <div class="modal-actions">
-        <button class="btn-cancel" id="modal-cancel">취소</button>
-        <button class="btn-confirm" id="modal-confirm">추가</button>
+        <button class="btn-cancel">취소</button>
+        <button class="btn-confirm">추가</button>
       </div>
-    </div>`;
-
-  document.getElementById('modal-root').appendChild(backdrop);
-
-  const titleInput = document.getElementById('ev-title');
-  titleInput.focus();
-
-  function close() {
-    backdrop.remove();
-    FocusManager.restore();
-  }
-
-  document.getElementById('modal-cancel').addEventListener('click', close);
-
-  document.getElementById('modal-confirm').addEventListener('click', () => {
-    const title = titleInput.value.trim();
-    if (!title) { titleInput.focus(); return; }
-    handleAddEvent({
-      title,
-      time:  document.getElementById('ev-time').value  || null,
-      color: document.getElementById('ev-color').value || 'default',
+    </div>`,
+    bd => {
+      const title = bd.querySelector('#ev-title').value.trim();
+      if (!title) { bd.querySelector('#ev-title').focus(); return false; }
+      store.dispatch({ type:'EVENT_ADD', payload:{
+        id:newId('evt'), title, date:selectedDate,
+        time:bd.querySelector('#ev-time').value||null,
+        color:bd.querySelector('#ev-color').value||'default',
+        createdAt:nowISO(),
+      }});
+      return true;
     });
-    close();
+}
+
+function openAddTodoModal() {
+  FocusManager._lastTarget = el('todo-panel');
+  openModal(`
+    <div class="modal-box">
+      <div class="modal-title">할 일 추가</div>
+      <div class="modal-field"><label>제목 *</label>
+        <input id="td-title" type="text" placeholder="할 일 제목" maxlength="100"></div>
+      <div class="modal-field"><label>우선순위</label>
+        <select id="td-prio">
+          <option value="normal">보통</option>
+          <option value="high">높음</option>
+          <option value="low">낮음</option>
+        </select></div>
+      <div class="modal-field"><label>마감일 (선택)</label>
+        <input id="td-due" type="date" value="${selectedDate}"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel">취소</button>
+        <button class="btn-confirm">추가</button>
+      </div>
+    </div>`,
+    bd => {
+      const title = bd.querySelector('#td-title').value.trim();
+      if (!title) { bd.querySelector('#td-title').focus(); return false; }
+      store.dispatch({ type:'TODO_ADD', payload:{
+        id:newId('td'), title,
+        priority:bd.querySelector('#td-prio').value,
+        dueDate:bd.querySelector('#td-due').value||null,
+        createdAt:nowISO(),
+      }});
+      return true;
+    });
+}
+
+/* ═══════════════════════════════════
+   BINDINGS (one-time)
+═══════════════════════════════════ */
+function setupBindings() {
+  // Nav
+  document.querySelectorAll('.nav-btn').forEach(btn =>
+    btn.addEventListener('click', () => { currentView = btn.dataset.view; render(); })
+  );
+
+  // Calendar
+  el('cal-prev').addEventListener('click', () => {
+    if (--viewMonth < 0) { viewMonth=11; viewYear--; } renderCalendar();
+  });
+  el('cal-next').addEventListener('click', () => {
+    if (++viewMonth > 11) { viewMonth=0; viewYear++; } renderCalendar();
+  });
+  el('cal-today').addEventListener('click', () => {
+    const t=new Date(); viewYear=t.getFullYear(); viewMonth=t.getMonth();
+    selectedDate=todayStr(); renderCalendar();
+  });
+  el('cal-add-btn').addEventListener('click', openAddEventModal);
+
+  // Todo
+  el('todo-add-btn').addEventListener('click', openAddTodoModal);
+  el('todo-clear-done').addEventListener('click', () => {
+    if (getTodos().some(t=>t.done))
+      store.dispatch({ type:'TODO_CLEAR_DONE' });
   });
 
-  // ESC
-  backdrop.addEventListener('keydown', e => {
-    if (e.key === 'Escape') close();
+  // Memo
+  el('memo-textarea').addEventListener('input', e => scheduleMemoSave(e.target.value));
+  el('memo-prev').addEventListener('click', () => {
+    const d=new Date(selectedDate+'T00:00:00'); d.setDate(d.getDate()-1);
+    selectedDate=toDateStr(d); renderMemo();
   });
-
-  // backdrop 클릭 (modal-box 외부)
-  backdrop.addEventListener('click', e => {
-    if (e.target === backdrop) close();
+  el('memo-next').addEventListener('click', () => {
+    const d=new Date(selectedDate+'T00:00:00'); d.setDate(d.getDate()+1);
+    selectedDate=toDateStr(d); renderMemo();
   });
+  el('memo-today').addEventListener('click', () => { selectedDate=todayStr(); renderMemo(); });
 
-  // Enter → confirm
-  titleInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('modal-confirm').click();
+  // Snapshot
+  el('sv-copy').addEventListener('click', () => {
+    navigator.clipboard?.writeText(el('sv-json').textContent);
+    el('sv-copy').textContent='복사됨 ✓';
+    setTimeout(()=>{ el('sv-copy').textContent='JSON 복사'; }, 1500);
   });
 }
 
-/* --- XSS 방어 --- */
-function escHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-/* --- EVENT BINDINGS --- */
-document.getElementById('prev-month').addEventListener('click', () => {
-  viewMonth--;
-  if (viewMonth < 0) { viewMonth = 11; viewYear--; }
-  render();
-});
-document.getElementById('next-month').addEventListener('click', () => {
-  viewMonth++;
-  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
-  render();
-});
-document.getElementById('go-today').addEventListener('click', () => {
-  const today = new Date();
-  viewYear     = today.getFullYear();
-  viewMonth    = today.getMonth();
-  selectedDate = todayStr();
-  render();
-});
-document.getElementById('add-btn').addEventListener('click', () => {
-  FocusManager._lastTarget = document.getElementById('calendar-panel');
-  openAddModal();
-});
-
-/* --- Store subscribe → render ─────────────────────
-   단방향 흐름 종착점: snapshot 변경 → UI 갱신
----------------------------------------------------*/
+/* ═══════════════════════════════════
+   INIT
+═══════════════════════════════════ */
 store.subscribe(render);
-
-/* --- INIT --- */
+setupBindings();
 render();
-FocusManager.focusById('calendar-panel');
+FocusManager.focusById('cal-panel');
