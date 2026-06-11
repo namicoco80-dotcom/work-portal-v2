@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+<title>업무Portal v2</title>
+<style>
+/* ── CSS Variables ──────────────────────────────── */
+:root {
+  --bg:         #0d1117;
+  --surface:    #161b22;
+  --surface2:   #1c2128;
+  --border:     #30363d;
+  --text:       #e6edf3;
+  --muted:      #8b949e;
+  --accent:     #58a6ff;
+  --green:      #3fb950;
+  --red:        #f85149;
+  --today-bg:   rgba(88,166,255,.12);
+  --today-ring: #58a6ff;
+  --font:       'Segoe UI', system-ui, -apple-system, sans-serif;
+  --radius:     8px;
+}
+
+/* ── Reset ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+button { font-family: inherit; cursor: pointer; }
+
+/* ── Layout ─────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* TopBar */
+#topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px; height: 48px;
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+#topbar .logo { font-size: 13px; font-weight: 700; letter-spacing: -.3px; }
+#topbar .ver  { font-size: 11px; color: var(--muted); background: var(--surface2);
+                border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; }
+#topbar .spacer { flex: 1; }
+#topbar button { -webkit-app-region: no-drag; }
+
+/* Main area */
+#main { flex: 1; overflow: hidden; display: flex; }
+
+/* ── Calendar Panel ──────────────────────────────── */
+#calendar-panel {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; padding: 20px 24px;
+}
+
+/* Date header */
+.cal-header {
+  display: flex; align-items: baseline; gap: 10px; margin-bottom: 20px;
+}
+.cal-header .today-label {
+  font-size: 22px; font-weight: 700;
+}
+.cal-header .today-sub {
+  font-size: 13px; color: var(--muted);
+}
+
+/* Month mini-nav */
+.cal-nav {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+}
+.cal-nav .month-label { font-size: 13px; font-weight: 600; min-width: 90px; }
+.cal-nav button {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; width: 28px; height: 28px;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+}
+.cal-nav button:hover { background: var(--surface); border-color: var(--accent); }
+.cal-nav .today-btn {
+  font-size: 12px; padding: 0 10px; width: auto;
+  color: var(--accent); border-color: var(--accent);
+}
+
+/* Week strip */
+.week-strip {
+  display: grid; grid-template-columns: repeat(7,1fr);
+  gap: 4px; margin-bottom: 16px;
+}
+.week-strip .day-name {
+  text-align: center; font-size: 11px; color: var(--muted);
+  text-transform: uppercase; padding: 4px 0;
+}
+.day-cell {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 13px; cursor: pointer;
+  position: relative; transition: background .12s;
+}
+.day-cell:hover { background: var(--surface2); }
+.day-cell.today {
+  background: var(--today-bg);
+  color: var(--accent); font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px var(--today-ring);
+}
+.day-cell.selected { background: var(--accent); color: #000; font-weight: 700; }
+.day-cell.has-event::after {
+  content: ''; position: absolute; bottom: 3px;
+  width: 4px; height: 4px; border-radius: 50%; background: var(--green);
+}
+.day-cell.other-month { color: var(--muted); opacity: .4; }
+
+/* Event list */
+.event-section { flex: 1; overflow-y: auto; }
+.event-section-title {
+  font-size: 12px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .06em; margin-bottom: 10px;
+}
+.event-list { display: flex; flex-direction: column; gap: 6px; }
+.event-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 14px;
+  transition: border-color .15s;
+}
+.event-item:hover { border-color: var(--accent); }
+.event-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.event-dot.default { background: var(--accent); }
+.event-dot.red     { background: var(--red); }
+.event-dot.green   { background: var(--green); }
+.event-title { flex: 1; font-size: 13px; }
+.event-time  { font-size: 12px; color: var(--muted); }
+.event-del   {
+  background: none; border: none; color: var(--muted);
+  font-size: 16px; line-height: 1; padding: 2px 4px; border-radius: 4px;
+  opacity: 0; transition: opacity .12s;
+}
+.event-item:hover .event-del { opacity: 1; }
+.event-del:hover { color: var(--red); background: rgba(248,81,73,.12); }
+
+.empty-state {
+  text-align: center; color: var(--muted); font-size: 13px;
+  padding: 32px 0; opacity: .7;
+}
+
+/* Add button */
+#add-btn {
+  margin-top: 16px;
+  background: var(--accent); color: #000; border: none;
+  border-radius: var(--radius); padding: 10px 20px;
+  font-size: 13px; font-weight: 600; align-self: flex-start;
+  transition: opacity .15s;
+}
+#add-btn:hover { opacity: .85; }
+
+/* ── Modal ───────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px; width: 340px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+}
+.modal-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+.modal-field { margin-bottom: 12px; }
+.modal-field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+.modal-field input, .modal-field select {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 13px; padding: 8px 10px;
+  outline: none; font-family: inherit;
+}
+.modal-field input:focus, .modal-field select:focus {
+  border-color: var(--accent);
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.modal-actions button {
+  border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 500; border: none;
+}
+.btn-cancel { background: var(--surface2); color: var(--muted); border: 1px solid var(--border) !important; }
+.btn-confirm { background: var(--accent); color: #000; font-weight: 700; }
+.btn-cancel:hover  { color: var(--text); }
+.btn-confirm:hover { opacity: .85; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TopBar -->
+  <div id="topbar">
+    <span class="logo">업무Portal</span>
+    <span class="ver" id="ver-label">v2</span>
+    <span class="spacer"></span>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+    <div id="calendar-panel" tabindex="0">
+
+      <!-- Date header -->
+      <div class="cal-header">
+        <span class="today-label" id="today-label"></span>
+        <span class="today-sub"  id="today-sub"></span>
+      </div>
+
+      <!-- Month nav -->
+      <div class="cal-nav">
+        <button id="prev-month" title="이전 달">‹</button>
+        <span class="month-label" id="month-label"></span>
+        <button id="next-month" title="다음 달">›</button>
+        <button class="today-btn" id="go-today">오늘</button>
+      </div>
+
+      <!-- Week day names -->
+      <div class="week-strip" id="day-names"></div>
+
+      <!-- Day cells -->
+      <div class="week-strip" id="day-cells"></div>
+
+      <!-- Event list -->
+      <div class="event-section">
+        <div class="event-section-title" id="event-date-label"></div>
+        <div class="event-list" id="event-list"></div>
+      </div>
+
+      <!-- Add button -->
+      <button id="add-btn">+ 일정 추가</button>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal (ModalManager가 동적 생성 — 여기는 placeholder) -->
+<div id="modal-root"></div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

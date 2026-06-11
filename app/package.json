@@ -1,0 +1,14 @@
+{
+  "name": "work-portal-v2",
+  "version": "0.1.0",
+  "description": "업무Portal v2 — Electron App",
+  "main": "src/main/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dev":   "NODE_ENV=development electron ."
+  },
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}
