@@ -9,6 +9,7 @@
 import { reduce as todoReduce }     from './todo-engine.js';
 import { reduce as memoReduce }     from './memo-engine.js';
 import { reduce as calendarReduce } from './calendar-engine.js';
+import { INITIAL_SNAPSHOT }         from '../core/snapshot.js';
 
 const TODO_ACTIONS     = ['TODO_ADD', 'TODO_UPDATE', 'TODO_DELETE', 'TODO_COMPLETE', 'TODO_CLEAR_DONE'];
 const MEMO_ACTIONS     = ['MEMO_SET', 'MEMO_UPDATE', 'MEMO_PIN'];
@@ -23,7 +24,6 @@ export function reduce(snapshot, action) {
     return { ...action.payload.snapshot };
   }
   if (action.type === 'SNAPSHOT_RESET') {
-    const { INITIAL_SNAPSHOT } = require('./snapshot.js');
     return { ...INITIAL_SNAPSHOT };
   }
 
