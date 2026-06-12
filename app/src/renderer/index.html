@@ -171,6 +171,13 @@ nav {
 .prio-normal { background: rgba(88,166,255,.12); color: var(--accent); }
 .prio-low    { background: rgba(139,148,158,.12);color: var(--muted); }
 
+/* linked todo badge */
+.link-badge {
+  font-size: 10px; color: var(--green); background: rgba(63,185,80,.15);
+  border-radius: 4px; padding: 1px 5px; font-weight: 700; flex-shrink: 0;
+}
+.event-item.linked-todo { border-left: 2px solid var(--green); }
+
 .done-section-title {
   font-size: 11px; color: var(--muted); text-transform: uppercase;
   letter-spacing: .06em; margin: 16px 0 8px; font-weight: 600;

@@ -1,11 +1,9 @@
 // engine/calendar-engine.js
 // 업무Portal v2 — Calendar Engine (Pure Function)
 //
-// 담당: EVENT_ADD / EVENT_UPDATE / EVENT_DELETE
+// STEP 8: EVENT_DELETE 시 linked todo.linkedEventId 제거 (역방향)
 //
-// 금지: 캘린더 월 이동, 글로우, 스크롤, 포커스, DOM, NLP 파싱
-// 금지: crypto.randomUUID() / Date.now() 직접 호출
-// ID/시간값은 반드시 payload로 주입 → Determinism 보장
+// 금지: DOM / store 직접 접근 / crypto.randomUUID() / Date.now() 직접 호출
 
 export function reduce(snapshot, action) {
   switch (action.type) {
@@ -16,8 +14,7 @@ export function reduce(snapshot, action) {
   }
 }
 
-// EVENT_ADD
-// payload: { id, title, date, time?, color?, createdAt }
+/* --- EVENT_ADD --------------------------------------- */
 function handleAdd(snapshot, payload) {
   const event = {
     id:        payload.id,
@@ -25,6 +22,7 @@ function handleAdd(snapshot, payload) {
     date:      payload.date,
     time:      payload.time      || null,
     color:     payload.color     || 'default',
+    todoId:    payload.todoId    || null,   // linked todo 역참조
     createdAt: payload.createdAt || '',
   };
   return {
@@ -39,8 +37,7 @@ function handleAdd(snapshot, payload) {
   };
 }
 
-// EVENT_UPDATE
-// payload: { id, changes: { title?, date?, time?, color? } }
+/* --- EVENT_UPDATE ------------------------------------ */
 function handleUpdate(snapshot, payload) {
   return {
     ...snapshot,
@@ -56,9 +53,13 @@ function handleUpdate(snapshot, payload) {
   };
 }
 
-// EVENT_DELETE
-// payload: { id }
+/* --- EVENT_DELETE ------------------------------------
+   linked todo의 linkedEventId 제거 (todo 자체는 유지)
+----------------------------------------------------- */
 function handleDelete(snapshot, payload) {
+  const target    = snapshot.data.calendar.events.find(e => e.id === payload.id);
+  const linkedTodoId = target?.todoId || null;
+
   return {
     ...snapshot,
     data: {
@@ -66,6 +67,15 @@ function handleDelete(snapshot, payload) {
       calendar: {
         ...snapshot.data.calendar,
         events: snapshot.data.calendar.events.filter(e => e.id !== payload.id),
+      },
+      todos: {
+        ...snapshot.data.todos,
+        // linked todo의 linkedEventId만 null로 — todo 자체는 유지
+        items: linkedTodoId
+          ? snapshot.data.todos.items.map(t =>
+              t.id === linkedTodoId ? { ...t, linkedEventId: null } : t
+            )
+          : snapshot.data.todos.items,
       },
     },
   };

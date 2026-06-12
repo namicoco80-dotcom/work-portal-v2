@@ -107,8 +107,9 @@ function renderCalendar() {
     listEl.innerHTML = `<div class="empty-state">등록된 일정이 없습니다</div>`;
   } else {
     listEl.innerHTML = events.map(e => `
-      <div class="event-item">
+      <div class="event-item${e.todoId ? ' linked-todo' : ''}">
         <div class="event-dot color-${e.color||'default'}"></div>
+        ${e.todoId ? '<span class="link-badge" title="할 일 연결">✓</span>' : ''}
         <span class="event-title">${escHtml(e.title)}</span>
         ${e.time ? `<span class="event-time">${e.time}</span>` : ''}
         <button class="icon-btn del-btn" data-id="${e.id}">×</button>
@@ -279,11 +280,14 @@ function openAddTodoModal() {
     bd => {
       const title = bd.querySelector('#td-title').value.trim();
       if (!title) { bd.querySelector('#td-title').focus(); return false; }
+      const dueDate = bd.querySelector('#td-due').value || null;
       store.dispatch({ type:'TODO_ADD', payload:{
-        id:newId('td'), title,
-        priority:bd.querySelector('#td-prio').value,
-        dueDate:bd.querySelector('#td-due').value||null,
-        createdAt:nowISO(),
+        id:       newId('td'),
+        title,
+        priority: bd.querySelector('#td-prio').value,
+        dueDate,
+        eventId:  dueDate ? newId('evt') : undefined,
+        createdAt: nowISO(),
       }});
       return true;
     });
