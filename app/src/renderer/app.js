@@ -343,9 +343,46 @@ function setupBindings() {
 }
 
 /* ═══════════════════════════════════
+   PERSISTENCE
+   저장: store.subscribe → debounce → snapshotSave
+   로드: 앱 시작 시 snapshotLoad → store 복원
+═══════════════════════════════════ */
+let saveTimer = null;
+
+function scheduleSave(snapshot) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      await window.electronAPI?.snapshotSave(snapshot);
+    } catch(e) {
+      console.warn('[Persistence] save failed:', e.message);
+    }
+  }, 300);
+}
+
+async function initPersistence() {
+  try {
+    const saved = await window.electronAPI?.snapshotLoad();
+    if (saved) {
+      // 저장된 snapshot으로 store 복원
+      store.dispatch({ type: 'SNAPSHOT_RESTORE', payload: saved });
+    }
+  } catch(e) {
+    console.warn('[Persistence] load failed — using initial snapshot:', e.message);
+  }
+}
+
+/* ═══════════════════════════════════
    INIT
 ═══════════════════════════════════ */
+// 1. persistence subscribe (저장은 render와 독립)
+store.subscribe(snapshot => scheduleSave(snapshot));
+
+// 2. render subscribe
 store.subscribe(render);
+
+// 3. 저장 데이터 복원 후 초기 render
 setupBindings();
+await initPersistence();
 render();
 FocusManager.focusById('cal-panel');

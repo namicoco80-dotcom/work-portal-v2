@@ -21,7 +21,8 @@ export function reduce(snapshot, action) {
   if (CALENDAR_ACTIONS.includes(action.type)) return calendarReduce(snapshot, action);
 
   if (action.type === 'SNAPSHOT_RESTORE') {
-    return { ...action.payload.snapshot };
+    // payload = saved snapshot object (from repository)
+    return { ...action.payload };
   }
   if (action.type === 'SNAPSHOT_RESET') {
     return { ...INITIAL_SNAPSHOT };
