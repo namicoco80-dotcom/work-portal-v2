@@ -258,6 +258,9 @@ nav {
   <div id="topbar">
     <span class="logo">업무Portal</span>
     <span class="ver-chip">v2</span>
+    <div style="flex:1"></div>
+    <button id="sv-undo-btn" class="ghost-btn" style="-webkit-app-region:no-drag;font-size:12px;padding:4px 10px" title="실행 취소 (Ctrl+Z)" disabled>↩ 취소</button>
+    <button id="sv-redo-btn" class="ghost-btn" style="-webkit-app-region:no-drag;font-size:12px;padding:4px 10px" title="다시 실행 (Ctrl+Y)" disabled>↪ 다시</button>
   </div>
 
   <!-- Nav -->
@@ -342,6 +345,12 @@ nav {
         <div class="sv-card"><div class="lbl">Todos</div><div class="val" id="sv-todos">—</div></div>
         <div class="sv-card"><div class="lbl">Events</div><div class="val" id="sv-events">—</div></div>
         <div class="sv-card"><div class="lbl">Memos</div><div class="val" id="sv-memos">—</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:12px;color:var(--muted)">이력:</span>
+        <span style="font-size:13px;font-weight:600" id="sv-history-count">—</span>
+        <button id="sv-undo-btn-2" class="ghost-btn" style="font-size:12px;padding:4px 10px">↩ 취소</button>
+        <button id="sv-redo-btn-2" class="ghost-btn" style="font-size:12px;padding:4px 10px">↪ 다시</button>
       </div>
       <div class="sv-json-wrap">
         <div class="sv-json-header">

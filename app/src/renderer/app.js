@@ -4,14 +4,18 @@
 // Flow:  UI → dispatch(command) → snapshot → render(snapshot)
 
 /* --- IMPORTS --- */
-import { store }        from '../../core/store.js';
-import { FocusManager } from '../../shared/focus-manager.js';
+import { store }              from '../../core/store.js';
+import { FocusManager }        from '../../shared/focus-manager.js';
+import { createHistoryManager } from '../../shared/history-manager.js';
 
 /* --- CONSTANTS --- */
 const PRIORITIES = { high:'높음', normal:'보통', low:'낮음' };
 
 /* --- UI STATE (view cursor only) --- */
 let currentView  = 'calendar';
+
+/* --- HistoryManager (Engine 밖, Store 밖) --- */
+const hm = createHistoryManager(store);
 let viewYear     = new Date().getFullYear();
 let viewMonth    = new Date().getMonth();
 let selectedDate = toDateStr(new Date());
@@ -197,6 +201,10 @@ function scheduleMemoSave(content) {
 ═══════════════════════════════════ */
 function renderSnapshot() {
   const s = snap();
+  const hmInfo = hm.getInfo();
+  el('sv-undo-btn').disabled  = !hmInfo.canUndo;
+  el('sv-redo-btn').disabled  = !hmInfo.canRedo;
+  el('sv-history-count').textContent = `${hmInfo.index + 1} / ${hmInfo.total}`;
   el('sv-engine').textContent  = s.engine_version;
   el('sv-snap').textContent    = s.snapshot_version;
   el('sv-updated').textContent = s.metadata?.updatedAt?.slice(0,19).replace('T',' ') || '—';
@@ -333,6 +341,16 @@ function setupBindings() {
     selectedDate=toDateStr(d); renderMemo();
   });
   el('memo-today').addEventListener('click', () => { selectedDate=todayStr(); renderMemo(); });
+
+  // Undo / Redo 버튼
+  el('sv-undo-btn').addEventListener('click', () => { hm.undo(); render(); });
+  el('sv-redo-btn').addEventListener('click', () => { hm.redo(); render(); });
+
+  // 키보드 단축키 (Ctrl+Z / Ctrl+Y)
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'z' && !e.shiftKey) { e.preventDefault(); hm.undo(); }
+    if (e.ctrlKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); hm.redo(); }
+  });
 
   // Snapshot
   el('sv-copy').addEventListener('click', () => {
