@@ -5,15 +5,12 @@
   "main": "src/main/main.js",
   "type": "module",
   "scripts": {
-    "start":   "electron .",
-    "dev":     "NODE_ENV=development electron .",
-    "build":   "electron-builder",
+    "start": "electron .",
+    "build":     "electron-builder",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac"
   },
-  "dependencies": {
-    "better-sqlite3": "^9.4.3"
-  },
+  "dependencies": {},
   "devDependencies": {
     "electron":         "^30.0.0",
     "electron-builder": "^24.13.3"
@@ -29,24 +26,16 @@
       "shared/**/*",
       "package.json"
     ],
-    "extraResources": [],
     "win": {
       "target": [
         { "target": "portable", "arch": ["x64"] },
         { "target": "nsis",     "arch": ["x64"] }
-      ],
-      "icon": "assets/icon.ico"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon":   "assets/icon.icns"
+      ]
     },
     "nsis": {
-      "oneClick":          false,
-      "allowToChangeInstallationDirectory": true,
-      "installerLanguages": ["Korean"]
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
-    "asar": true,
-    "asarUnpack": ["**/better-sqlite3/**"]
+    "asar": true
   }
 }

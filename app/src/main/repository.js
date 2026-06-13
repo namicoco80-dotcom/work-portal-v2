@@ -1,86 +1,66 @@
 // src/main/repository.js
-// 업무Portal v2 — Repository (Persistence Layer)
+// 업무Portal v2 — Repository (Storage Adapter)
 //
-// better-sqlite3 = CJS only → createRequire로 로드
-// type:module 환경에서 require() 사용
+// Interface (변경 불가):
+//   saveSnapshot(snapshot) → void
+//   loadSnapshot()         → snapshot | null
+//   loadHistory(limit)     → [{id, saved_at}]
+//   closeDb()              → void
+//
+// Adapter:
+//   SQLiteRepository  — 정식 (Node v20 LTS 환경)
+//   MemoryRepository  — fallback (Node v24 / 네이티브 빌드 불가 환경)
+//
+// 현재: MemoryRepository 활성화
+// TODO: Node v20 LTS 설치 후 SQLiteRepository로 교체
 
-import { createRequire } from 'module';
-import { app }           from 'electron';
-import { join }          from 'path';
-
-const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
-
-function getDbPath() {
-  return join(app.getPath('userData'), 'work-portal-v2.db');
-}
-
-let _db = null;
-
-function getDb() {
-  if (_db) return _db;
-  _db = new Database(getDbPath());
-  _db.pragma('journal_mode = WAL');
-  _db.pragma('foreign_keys = ON');
-  initSchema(_db);
-  return _db;
-}
-
-function initSchema(db) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS snapshots (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT,
-      snapshot_version TEXT    NOT NULL,
-      engine_version   TEXT    NOT NULL,
-      data_json        TEXT    NOT NULL,
-      saved_at         TEXT    NOT NULL,
-      is_current       INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE INDEX IF NOT EXISTS idx_current ON snapshots(is_current);
-  `);
-}
-
-export function saveSnapshot(snapshot) {
-  const db = getDb();
-  const upsert = db.transaction(() => {
-    db.prepare('UPDATE snapshots SET is_current=0 WHERE is_current=1').run();
-    db.prepare(
-      'INSERT INTO snapshots (snapshot_version,engine_version,data_json,saved_at,is_current) VALUES(?,?,?,?,1)'
-    ).run(
-      snapshot.snapshot_version,
-      snapshot.engine_version,
-      JSON.stringify(snapshot),
-      new Date().toISOString()
-    );
-  });
-  upsert();
-}
-
-export function loadSnapshot() {
-  const db = getDb();
-  const row = db.prepare(
-    'SELECT data_json,snapshot_version,engine_version FROM snapshots WHERE is_current=1 LIMIT 1'
-  ).get();
-  if (!row) return null;
-  try {
-    const snap = JSON.parse(row.data_json);
-    if (snap.snapshot_version !== row.snapshot_version) {
-      console.warn(`[Repo] SOFT READ — version mismatch`);
-    }
-    return snap;
-  } catch(e) {
-    console.error('[Repo] parse failed:', e.message);
-    return null;
+/* --- MemoryRepository --------------------------------
+   앱 종료 시 데이터 초기화됨 (persistence 없음)
+   Interface는 SQLiteRepository와 동일하게 유지
+----------------------------------------------------- */
+class MemoryRepository {
+  constructor() {
+    this._current = null;
+    this._history = [];
   }
+
+  saveSnapshot(snapshot) {
+    this._current = JSON.parse(JSON.stringify(snapshot));  // deep clone
+    this._history.push({
+      id:       this._history.length + 1,
+      saved_at: new Date().toISOString(),
+      engine_version:   snapshot.engine_version,
+      snapshot_version: snapshot.snapshot_version,
+    });
+  }
+
+  loadSnapshot() {
+    return this._current ? JSON.parse(JSON.stringify(this._current)) : null;
+  }
+
+  loadHistory(limit = 20) {
+    return [...this._history].reverse().slice(0, limit);
+  }
+
+  closeDb() { /* no-op */ }
 }
 
-export function loadHistory(limit = 20) {
-  const db = getDb();
-  return db.prepare(
-    'SELECT id,snapshot_version,engine_version,saved_at FROM snapshots ORDER BY id DESC LIMIT ?'
-  ).all(limit);
-}
+/* --- SQLiteRepository (비활성화) ----------------------
+   Node v20 LTS + better-sqlite3 환경에서 활성화
+   import { createRequire } from 'module';
+   import { app } from 'electron';
+   import { join } from 'path';
+   const require = createRequire(import.meta.url);
+   const Database = require('better-sqlite3');
+   ...
+----------------------------------------------------- */
 
-export function closeDb() {
-  if (_db) { _db.close(); _db = null; }
-}
+// ── Active Adapter ────────────────────────────────
+// SQLite 준비되면 여기만 교체:
+// const repo = new SQLiteRepository();
+const repo = new MemoryRepository();
+
+export const saveSnapshot  = (s)      => repo.saveSnapshot(s);
+export const loadSnapshot  = ()       => repo.loadSnapshot();
+export const loadHistory   = (n = 20) => repo.loadHistory(n);
+export const closeDb       = ()       => repo.closeDb();

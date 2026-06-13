@@ -141,3 +141,27 @@ Windows에서는 표준 타이틀바 사용.
 | 흰 화면 | preload 오류 | DevTools Console 확인 |
 | snapshot 저장 안 됨 | IPC 오류 | Main process 로그 확인 |
 | Ctrl+F 동작 안 함 | 포커스 문제 | 앱 창 클릭 후 시도 |
+
+
+---
+
+## RC2 변경 사항 (2026-06-13)
+
+### Storage Adapter 전환
+
+| 항목 | 상태 |
+|---|---|
+| Repository interface | ✅ 유지 (saveSnapshot / loadSnapshot / loadHistory / closeDb) |
+| SQLiteRepository | ⏳ Node v20 LTS 환경에서 활성화 예정 |
+| MemoryRepository | ✅ 현재 활성화 (fallback) |
+
+**현재 제한:** 앱 종료 시 데이터 초기화됨.
+**교체 방법:** `repository.js` 마지막 줄 `new MemoryRepository()` → `new SQLiteRepository()`
+
+### Windows 호환
+- `NODE_ENV=development` 제거 → `npm start`로 실행
+- better-sqlite3 네이티브 빌드 요구사항 제거
+
+### RC2 체크리스트
+- R1~R7: MemoryRepository로 검증
+- R8 Persistence: SQLiteRepository 교체 후 별도 검증
