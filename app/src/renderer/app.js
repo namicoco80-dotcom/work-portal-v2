@@ -7,6 +7,7 @@
 import { store }              from '../../core/store.js';
 import { FocusManager }        from '../../shared/focus-manager.js';
 import { createHistoryManager } from '../../shared/history-manager.js';
+import { createSearchManager }  from '../../shared/search-manager.js';
 
 /* --- CONSTANTS --- */
 const PRIORITIES = { high:'높음', normal:'보통', low:'낮음' };
@@ -16,6 +17,11 @@ let currentView  = 'calendar';
 
 /* --- HistoryManager (Engine 밖, Store 밖) --- */
 const hm = createHistoryManager(store);
+
+/* --- SearchManager (Engine 밖, Store 밖) --- */
+const sm = createSearchManager();
+store.subscribe(snapshot => sm.build(snapshot));
+sm.build(store.getSnapshot());
 let viewYear     = new Date().getFullYear();
 let viewMonth    = new Date().getMonth();
 let selectedDate = toDateStr(new Date());
@@ -205,6 +211,8 @@ function renderSnapshot() {
   el('sv-undo-btn').disabled  = !hmInfo.canUndo;
   el('sv-redo-btn').disabled  = !hmInfo.canRedo;
   el('sv-history-count').textContent = `${hmInfo.index + 1} / ${hmInfo.total}`;
+  const searchStats = sm.getStats();
+  el('sv-search-total').textContent = searchStats.total;
   el('sv-engine').textContent  = s.engine_version;
   el('sv-snap').textContent    = s.snapshot_version;
   el('sv-updated').textContent = s.metadata?.updatedAt?.slice(0,19).replace('T',' ') || '—';
@@ -341,6 +349,85 @@ function setupBindings() {
     selectedDate=toDateStr(d); renderMemo();
   });
   el('memo-today').addEventListener('click', () => { selectedDate=todayStr(); renderMemo(); });
+
+  // Search
+  const searchInput = el('search-input');
+  const searchResults = el('search-results');
+  const searchClose = el('search-close');
+
+  function doSearch() {
+    const kw = searchInput.value.trim();
+    const typeEls = document.querySelectorAll('.search-type-btn.active');
+    const types = typeEls.length
+      ? [...typeEls].map(b => b.dataset.type)
+      : ['todo','event','memo'];
+
+    const results = sm.query(kw, { types });
+    if (!kw && types.length === 3) {
+      searchResults.innerHTML = `<div class="empty-state" style="padding:12px">검색어를 입력하세요</div>`;
+      return;
+    }
+    if (!results.length) {
+      searchResults.innerHTML = `<div class="empty-state" style="padding:12px">결과 없음</div>`;
+      return;
+    }
+
+    const typeLabel = { todo:'할 일', event:'일정', memo:'메모' };
+    const typeColor = { todo:'var(--accent)', event:'var(--green)', memo:'var(--yellow)' };
+    searchResults.innerHTML = results.map(r => `
+      <div class="search-result-item" data-type="${r.type}" data-id="${r.id}" data-date="${r.date||''}">
+        <span class="sr-type" style="color:${typeColor[r.type]}">${typeLabel[r.type]}</span>
+        <div class="sr-body">
+          <div class="sr-title">${escHtml(r.title)}</div>
+          ${r.excerpt ? `<div class="sr-excerpt">${escHtml(r.excerpt.slice(0,80))}${r.excerpt.length>80?'…':''}</div>` : ''}
+          ${r.date ? `<div class="sr-date">${r.date}</div>` : ''}
+        </div>
+        ${r.type==='todo'&&r.meta.done ? '<span class="sr-done">완료</span>' : ''}
+      </div>`).join('');
+
+    // 결과 클릭 → 해당 view로 이동
+    searchResults.querySelectorAll('.search-result-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const { type, date } = item.dataset;
+        if (date) selectedDate = date;
+        if (type === 'memo') {
+          currentView = 'memo';
+        } else if (type === 'event') {
+          const d = new Date(date+'T00:00:00');
+          viewYear = d.getFullYear(); viewMonth = d.getMonth();
+          currentView = 'calendar';
+        } else {
+          currentView = 'todo';
+        }
+        el('search-panel').classList.add('hidden');
+        render();
+      });
+    });
+  }
+
+  searchInput.addEventListener('input', doSearch);
+  document.querySelectorAll('.search-type-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      doSearch();
+    })
+  );
+  searchClose.addEventListener('click', () => el('search-panel').classList.add('hidden'));
+
+  // Ctrl+F → 검색 열기
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'f') {
+      e.preventDefault();
+      el('search-panel').classList.remove('hidden');
+      searchInput.focus();
+    }
+    if (e.key === 'Escape') el('search-panel').classList.add('hidden');
+  });
+
+  el('nav-search-btn').addEventListener('click', () => {
+    el('search-panel').classList.remove('hidden');
+    searchInput.focus();
+  });
 
   // Undo / Redo 버튼
   el('sv-undo-btn').addEventListener('click', () => { hm.undo(); render(); });
