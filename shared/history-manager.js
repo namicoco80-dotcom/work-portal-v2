@@ -21,7 +21,7 @@
 const MAX_HISTORY = 50;
 
 export function createHistoryManager(store) {
-  let snapshots   = [store.getSnapshot()];  // S0 = 초기 상태
+  let snapshots   = [JSON.parse(JSON.stringify(store.getSnapshot()))];  // S0 = deep clone
   let index       = 0;
   let _paused     = false;  // SNAPSHOT_RESTORE 중 append 방지
 
@@ -32,8 +32,9 @@ export function createHistoryManager(store) {
     // Redo 이력 제거 (새 action이 오면 앞 이력 무효화)
     snapshots = snapshots.slice(0, index + 1);
 
-    // append
-    snapshots.push(next);
+    // deep clone 후 보관 — reference 오염 방지
+    // engine이 새 객체를 반환해도 중첩 배열은 mutable이므로 clone 필수
+    snapshots.push(JSON.parse(JSON.stringify(next)));
     if (snapshots.length > MAX_HISTORY) {
       snapshots = snapshots.slice(snapshots.length - MAX_HISTORY);
       index = snapshots.length - 1;
@@ -51,7 +52,8 @@ export function createHistoryManager(store) {
       if (index <= 0) return false;
       index--;
       _paused = true;
-      store.dispatch({ type: 'SNAPSHOT_RESTORE', payload: snapshots[index] });
+      // deep clone — 꺼낸 snapshot reference 보호
+      store.dispatch({ type: 'SNAPSHOT_RESTORE', payload: JSON.parse(JSON.stringify(snapshots[index])) });
       _paused = false;
       return true;
     },
@@ -64,7 +66,8 @@ export function createHistoryManager(store) {
       if (index >= snapshots.length - 1) return false;
       index++;
       _paused = true;
-      store.dispatch({ type: 'SNAPSHOT_RESTORE', payload: snapshots[index] });
+      // deep clone — 꺼낸 snapshot reference 보호
+      store.dispatch({ type: 'SNAPSHOT_RESTORE', payload: JSON.parse(JSON.stringify(snapshots[index])) });
       _paused = false;
       return true;
     },
