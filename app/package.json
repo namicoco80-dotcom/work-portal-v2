@@ -1,35 +1,47 @@
 {
   "name": "work-portal-v2",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "업무Portal v2 — Electron Desktop App",
   "main": "src/main/main.js",
   "type": "module",
   "scripts": {
     "start": "electron .",
-    "build":     "electron-builder",
+    "build": "electron-builder",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac"
   },
   "dependencies": {},
   "devDependencies": {
-    "electron":         "^30.0.0",
+    "electron": "^30.0.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId":       "kr.archsafe.work-portal-v2",
+    "appId": "kr.archsafe.work-portal-v2",
     "productName": "업무Portal",
-    "copyright":   "Copyright © 2026 Kevin",
+    "copyright": "Copyright © 2026 Kevin",
     "files": [
       "src/**/*",
       "core/**/*",
       "engine/**/*",
       "shared/**/*",
+      "audit/**/*",
+      "export/**/*",
       "package.json"
     ],
     "win": {
       "target": [
-        { "target": "portable", "arch": ["x64"] },
-        { "target": "nsis",     "arch": ["x64"] }
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
