@@ -5,6 +5,9 @@
 
 /* --- IMPORTS --- */
 import { store }              from '../../core/store.js';
+import { auditDispatch, initAudit } from '../../audit/audit-subscriber.js';
+import { printDailyReport }         from '../../export/daily-report.js';
+import { exportTimelineJSON }        from '../../export/timeline-export.js';
 import { FocusManager }        from '../../shared/focus-manager.js';
 import { createHistoryManager } from '../../shared/history-manager.js';
 import { createSearchManager }  from '../../shared/search-manager.js';
@@ -24,13 +27,17 @@ store.subscribe(snapshot => sm.build(snapshot));
 sm.build(store.getSnapshot());
 let viewYear     = new Date().getFullYear();
 let viewMonth    = new Date().getMonth();
-let selectedDate = toDateStr(new Date());
+let selectedDate = '';
 
 /* --- UTILS --- */
 function toDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function todayStr()   { return toDateStr(new Date()); }
+function todayStr() {
+  // new Date() 로컬 기준 — string 파싱 방지
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
 function newId(p='id'){ return `${p}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
 function nowISO()     { return new Date().toISOString(); }
 function escHtml(s)   {
@@ -49,6 +56,7 @@ function getMemo(date) { return snap().data.memo.byDate[date]?.content || ''; }
    RENDER ROUTER
 ═══════════════════════════════════ */
 function render() {
+  if (!selectedDate) selectedDate = todayStr();
   document.querySelectorAll('.view').forEach(v =>
     v.classList.toggle('hidden', v.id !== `view-${currentView}`));
   document.querySelectorAll('.nav-btn').forEach(btn =>
@@ -127,7 +135,7 @@ function renderCalendar() {
     listEl.querySelectorAll('.del-btn').forEach(btn =>
       btn.addEventListener('click', ev => {
         ev.stopPropagation();
-        store.dispatch({ type:'EVENT_DELETE', payload:{ id:btn.dataset.id } });
+        auditDispatch({ type:'EVENT_DELETE', payload:{ id:btn.dataset.id } });
       })
     );
   }
@@ -166,7 +174,7 @@ function renderTodo() {
   el('todo-list-wrap').querySelectorAll('.todo-check').forEach(btn => {
     btn.addEventListener('click', () => {
       const isDone = btn.dataset.done === 'true';
-      store.dispatch(isDone
+      auditDispatch(isDone
         ? { type:'TODO_UPDATE',    payload:{ id:btn.dataset.id, changes:{ done:false } } }
         : { type:'TODO_COMPLETE',  payload:{ id:btn.dataset.id } }
       );
@@ -175,7 +183,7 @@ function renderTodo() {
   el('todo-list-wrap').querySelectorAll('.del-btn').forEach(btn => {
     btn.addEventListener('click', ev => {
       ev.stopPropagation();
-      store.dispatch({ type:'TODO_DELETE', payload:{ id:btn.dataset.id } });
+      auditDispatch({ type:'TODO_DELETE', payload:{ id:btn.dataset.id } });
     });
   });
 }
@@ -197,7 +205,7 @@ function scheduleMemoSave(content) {
   clearTimeout(memoTimer);
   el('memo-saved').classList.add('hidden');
   memoTimer = setTimeout(() => {
-    store.dispatch({ type:'MEMO_SET', payload:{ date:selectedDate, content, updatedAt:nowISO() } });
+    auditDispatch({ type:'MEMO_SET', payload:{ date:selectedDate, content, updatedAt:nowISO() } });
     el('memo-saved').classList.remove('hidden');
   }, 600);
 }
@@ -263,7 +271,7 @@ function openAddEventModal() {
     bd => {
       const title = bd.querySelector('#ev-title').value.trim();
       if (!title) { bd.querySelector('#ev-title').focus(); return false; }
-      store.dispatch({ type:'EVENT_ADD', payload:{
+      auditDispatch({ type:'EVENT_ADD', payload:{
         id:newId('evt'), title, date:selectedDate,
         time:bd.querySelector('#ev-time').value||null,
         color:bd.querySelector('#ev-color').value||'default',
@@ -297,7 +305,7 @@ function openAddTodoModal() {
       const title = bd.querySelector('#td-title').value.trim();
       if (!title) { bd.querySelector('#td-title').focus(); return false; }
       const dueDate = bd.querySelector('#td-due').value || null;
-      store.dispatch({ type:'TODO_ADD', payload:{
+      auditDispatch({ type:'TODO_ADD', payload:{
         id:       newId('td'),
         title,
         priority: bd.querySelector('#td-prio').value,
@@ -335,7 +343,7 @@ function setupBindings() {
   el('todo-add-btn').addEventListener('click', openAddTodoModal);
   el('todo-clear-done').addEventListener('click', () => {
     if (getTodos().some(t=>t.done))
-      store.dispatch({ type:'TODO_CLEAR_DONE' });
+      auditDispatch({ type:'TODO_CLEAR_DONE' });
   });
 
   // Memo
@@ -433,6 +441,24 @@ function setupBindings() {
   el('sv-undo-btn').addEventListener('click', () => { hm.undo(); render(); });
   el('sv-redo-btn').addEventListener('click', () => { hm.redo(); render(); });
 
+  // Export 드롭다운
+  el('export-menu-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const dd = el('export-dropdown');
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  });
+  document.addEventListener('click', () => {
+    el('export-dropdown').style.display = 'none';
+  });
+  el('export-pdf-btn').addEventListener('click', () => {
+    el('export-dropdown').style.display = 'none';
+    printDailyReport(selectedDate);
+  });
+  el('export-json-btn').addEventListener('click', async () => {
+    el('export-dropdown').style.display = 'none';
+    await exportTimelineJSON();
+  });
+
   // 키보드 단축키 (Ctrl+Z / Ctrl+Y)
   document.addEventListener('keydown', e => {
     if (e.ctrlKey && e.key === 'z' && !e.shiftKey) { e.preventDefault(); hm.undo(); }
@@ -453,28 +479,43 @@ function setupBindings() {
    로드: 앱 시작 시 snapshotLoad → store 복원
 ═══════════════════════════════════ */
 let saveTimer = null;
+let _lastSnapshot = null;   // flush 시 최신 snapshot 참조용
+
+async function saveSnapshot(snapshot) {
+  try {
+    await window.electronAPI?.snapshotSave(snapshot);
+  } catch(e) {
+    console.warn('[Persistence] save failed:', e.message);
+  }
+}
 
 function scheduleSave(snapshot) {
+  _lastSnapshot = snapshot;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    try {
-      await window.electronAPI?.snapshotSave(snapshot);
-    } catch(e) {
-      console.warn('[Persistence] save failed:', e.message);
-    }
-  }, 300);
+  saveTimer = setTimeout(() => saveSnapshot(snapshot), 300);
 }
+
+// Shutdown flush: main → renderer flush 요청 수신
+window.electronAPI?.onFlushRequest(async () => {
+  clearTimeout(saveTimer);
+  if (_lastSnapshot) await saveSnapshot(_lastSnapshot);
+  window.electronAPI.flushComplete();
+});
 
 async function initPersistence() {
   try {
     const saved = await window.electronAPI?.snapshotLoad();
     if (saved) {
-      // 저장된 snapshot으로 store 복원
-      store.dispatch({ type: 'SNAPSHOT_RESTORE', payload: saved });
+      auditDispatch({ type: 'SNAPSHOT_RESTORE', payload: saved });
     }
   } catch(e) {
     console.warn('[Persistence] load failed — using initial snapshot:', e.message);
   }
+  // UI transient state는 restore 후 항상 today로 초기화
+  // selectedDate는 persist 대상 아님
+  selectedDate = todayStr();
+  viewYear     = new Date().getFullYear();
+  viewMonth    = new Date().getMonth();
 }
 
 /* ═══════════════════════════════════
@@ -486,7 +527,10 @@ store.subscribe(snapshot => scheduleSave(snapshot));
 // 2. render subscribe
 store.subscribe(render);
 
-// 3. 저장 데이터 복원 후 초기 render
+// 3. Audit Layer (observation only — store 계약 변경 없음)
+initAudit();
+
+// 4. 저장 데이터 복원 후 초기 render
 setupBindings();
 await initPersistence();
 render();
