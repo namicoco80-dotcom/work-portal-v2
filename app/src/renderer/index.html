@@ -104,9 +104,10 @@ nav {
 
 .day-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 18px; }
 .day-cell {
-  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  height: 36px; width: 36px;
+  display: flex; align-items: center; justify-content: center;
   border-radius: 50%; font-size: 13px; cursor: pointer; position: relative;
-  transition: background .1s;
+  transition: background .1s; margin: auto;
 }
 .day-cell:hover { background: var(--surface2); }
 .day-cell.today { background: rgba(88,166,255,.12); color: var(--accent);
@@ -284,6 +285,14 @@ nav {
     <button class="nav-btn"        data-view="todo">✅ 할 일</button>
     <button class="nav-btn"        data-view="memo">📝 메모</button>
     <button class="nav-btn"        data-view="snapshot">🔍 스냅샷</button>
+    <!-- Export dropdown -->
+    <div id="export-menu-wrap" style="position:relative;margin-left:auto;">
+      <button id="export-menu-btn" class="ghost-btn" style="-webkit-app-region:no-drag;font-size:12px;padding:4px 10px" title="내보내기">📤 내보내기 ▾</button>
+      <div id="export-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--border);border-radius:6px;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:200;">
+        <button id="export-pdf-btn"  style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:12px;background:none;border:none;cursor:pointer;color:var(--text)">📄 오늘 업무 보고서 (PDF)</button>
+        <button id="export-json-btn" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:12px;background:none;border:none;cursor:pointer;color:var(--text)">💾 전체 기록 내보내기 (JSON)</button>
+      </div>
+    </div>
   </nav>
 
   <!-- Search Panel (overlay) -->
