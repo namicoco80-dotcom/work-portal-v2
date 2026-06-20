@@ -35,8 +35,33 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
-app.on('window-all-closed', () => {
+/* ── Shutdown Flush ─────────────────────────────── */
+// renderer에게 flush 요청 → ACK 수신 후 종료
+// race 방지: isFlushing 플래그로 중복 방지
+let isFlushing = false;
+
+app.on('before-quit', (event) => {
+  if (isFlushing) return;          // ACK 후 재진입 → 통과
+  event.preventDefault();
+  isFlushing = true;
+  mainWindow?.webContents.send('snapshot:flush');
+
+  // Guard: renderer 무응답 시 2초 후 강제 종료
+  setTimeout(() => {
+    console.warn('[Shutdown] flush timeout — forcing exit');
+    closeDb();
+    app.exit(0);
+  }, 2000);
+});
+
+ipcMain.on('snapshot:flush-complete', () => {
   closeDb();
+  app.exit(0);
+});
+
+app.on('window-all-closed', () => {
+  // before-quit → flush 경로가 아닌 경우 (예: macOS Cmd+Q 외 강제종료)
+  if (!isFlushing) closeDb();
   if (process.platform !== 'darwin') app.quit();
 });
 app.on('activate', () => {
